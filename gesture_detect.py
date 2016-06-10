@@ -27,7 +27,8 @@ class MyGestureDetector(PiMotionAnalysis):
         x_move = ('' if abs(x_mean) < THRESHOLD else 'left' if x_mean < 0.0 else 'right')
         y_move = ('' if abs(y_mean) < THRESHOLD else 'up'   if y_mean < 0.0 else 'down')
         # Update the display
-        self.camera.annotate_text = '%s %s' % (x_move, y_move)
+        if x_move or y_move:
+            print('%s %s' % (x_move, y_move))
 
 with picamera.PiCamera() as camera:
     camera.resolution = (640, 480)
