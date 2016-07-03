@@ -1,7 +1,15 @@
 import picamera
 import numpy as np
+from operator import itemgetter
 from picamera.array import PiRGBAnalysis
 from picamera.color import Color
+
+THRESHOLD = 5.0
+COLORS = {
+    Color('#800'): 'red',
+    Color('#080'): 'green',
+    Color('#008'): 'blue',
+    }
 
 class MyColorAnalyzer(PiRGBAnalysis):
     def __init__(self, camera):
@@ -10,27 +18,26 @@ class MyColorAnalyzer(PiRGBAnalysis):
 
     def analyse(self, a):
         # Calculate the average color of the pixels in the middle box
-        c = Color(
+        sample = Color(
             r=int(np.mean(a[30:60, 60:120, 0])),
             g=int(np.mean(a[30:60, 60:120, 1])),
             b=int(np.mean(a[30:60, 60:120, 2]))
             )
-        # Convert the color to hue, saturation, lightness
-        h, l, s = c.hls
-        c = 'none'
-        # If the saturation is sufficiently high, determine the color
-        # from the hue
-        if s > 1/3:
-            if h > 8/9 or h < 1/36:
-                c = 'red'
-            elif 5/9 < h < 2/3:
-                c = 'blue'
-            elif 5/36 < h < 4/9:
-                c = 'green'
+        # Calculate matches, find the closest and check if it's below a
+        # threshold difference
+        matches = {
+            sample.difference(color, method='cie1976'): name
+            for color, name in COLORS.items()
+            }
+        matches = sorted(matches.items(), key=itemgetter(1))
+        if matches[0][0] < 5.0:
+            color = matches[0][1]
+        else:
+            color = 'none'
         # If the color has changed, update the display
-        if c != self.last_color:
-            self.camera.annotate_text = c
-            self.last_color = c
+        if color != self.last_color:
+            self.camera.annotate_text = color
+            self.last_color = color
 
 with picamera.PiCamera() as camera:
     camera.resolution = (160, 90)
@@ -41,7 +48,10 @@ with picamera.PiCamera() as camera:
     # Draw a box over the area we're going to watch
     camera.start_preview(alpha=128)
     box = np.zeros((96, 160, 3), dtype=np.uint8)
-    box[30:60, 60:120, :] = 0x80
+    box[30:31, 60:120, :] = 0xff
+    box[60:61, 60:120, :] = 0xff
+    box[30:60, 60:61, :] = 0xff
+    box[30:60, 120:121, :] = 0xff
     camera.add_overlay(memoryview(box), size=(160, 90), layer=3, alpha=64)
     # Construct the analysis output and start recording data to it
     with MyColorAnalyzer(camera) as color_analyzer:
